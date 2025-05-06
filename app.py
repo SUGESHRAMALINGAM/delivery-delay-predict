@@ -1,32 +1,37 @@
+# app.py
 from fastapi import FastAPI
-from schemas import ShipmentFeatures
+from pydantic import BaseModel
 import joblib
 import numpy as np
 
 app = FastAPI()
 
-# Load the model
 model = joblib.load("model.pkl")
+encoders = joblib.load("encoders.pkl")
 
-@app.get("/")
-def home():
-    return {"message": "Shipment Delay Prediction API is live."}
+class Shipment(BaseModel):
+    Warehouse_block: str
+    Mode_of_Shipment: str
+    Customer_care_calls: int
+    Customer_rating: int
+    Cost_of_the_Product: float
+    Prior_purchases: int
+    Product_importance: str
+    Gender: str
+    Discount_offered: float
+    Weight_in_gms: float
 
 @app.post("/predict")
-def predict(data: ShipmentFeatures):
-    input_data = np.array([[ 
-        data.Warehouse_block,
-        data.Mode_of_Shipment,
-        data.Customer_care_calls,
-        data.Customer_rating,
-        data.Cost_of_the_Product,
-        data.Prior_purchases,
-        data.Product_importance,
-        data.Gender,
-        data.Discount_offered,
-        data.Weight_in_gms
-    ]])
+def predict(data: Shipment):
+    input_dict = data.dict()
+    
+    # Manual Encoding
+    input_dict['Warehouse_block'] = encoders['Warehouse_block'].transform([input_dict['Warehouse_block']])[0]
+    input_dict['Mode_of_Shipment'] = encoders['Mode_of_Shipment'].transform([input_dict['Mode_of_Shipment']])[0]
+    input_dict['Product_importance'] = encoders['Product_importance'].transform([input_dict['Product_importance']])[0]
+    input_dict['Gender'] = encoders['Gender'].transform([input_dict['Gender']])[0]
 
-    prediction = model.predict(input_data)
-    result = "On Time" if prediction[0] == 1 else "Delayed"
-    return {"prediction": result}
+    features = list(input_dict.values())
+    prediction = model.predict([features])[0]
+
+    return {"prediction": int(prediction)}
