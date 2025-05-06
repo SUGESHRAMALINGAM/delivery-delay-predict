@@ -58,6 +58,6 @@ termcolor==2.4.0
 typing-extensions==4.11.0
 urllib3==2.2.1
 Werkzeug==3.0.3
-wrapt==1.16.0
+wrapt>=1.14.0,<1.16.0  # Adjusted to resolve conflict
 yarl==1.9.4
 zipp==3.18.1
