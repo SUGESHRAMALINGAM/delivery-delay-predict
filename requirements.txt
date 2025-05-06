@@ -63,3 +63,6 @@ yarl==1.9.4
 zipp==3.18.1
 pytest==7.4.2  # Add pytest to the dependencies list
 joblib
+scikit-learn
+pandas
+pydantic
