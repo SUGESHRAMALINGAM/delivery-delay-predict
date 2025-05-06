@@ -1,37 +1,53 @@
-# app.py
 from fastapi import FastAPI
-from pydantic import BaseModel
+from schemas import ShipmentFeatures
 import joblib
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
 app = FastAPI()
 
+# Load the model
 model = joblib.load("model.pkl")
-encoders = joblib.load("encoders.pkl")
 
-class Shipment(BaseModel):
-    Warehouse_block: str
-    Mode_of_Shipment: str
-    Customer_care_calls: int
-    Customer_rating: int
-    Cost_of_the_Product: float
-    Prior_purchases: int
-    Product_importance: str
-    Gender: str
-    Discount_offered: float
-    Weight_in_gms: float
+# Initialize LabelEncoders with the same mappings as Model.py
+le_warehouse = LabelEncoder()
+le_warehouse.classes_ = np.array(['A', 'B', 'C', 'D', 'F'])
+
+le_shipment = LabelEncoder()
+le_shipment.classes_ = np.array(['Flight', 'Ship', 'Road'])
+
+le_importance = LabelEncoder()
+le_importance.classes_ = np.array(['low', 'medium', 'high'])
+
+le_gender = LabelEncoder()
+le_gender.classes_ = np.array(['F', 'M'])
+
+@app.get("/")
+def home():
+    return {"message": "Shipment Delay Prediction API is live."}
 
 @app.post("/predict")
-def predict(data: Shipment):
-    input_dict = data.dict()
-    
-    # Manual Encoding
-    input_dict['Warehouse_block'] = encoders['Warehouse_block'].transform([input_dict['Warehouse_block']])[0]
-    input_dict['Mode_of_Shipment'] = encoders['Mode_of_Shipment'].transform([input_dict['Mode_of_Shipment']])[0]
-    input_dict['Product_importance'] = encoders['Product_importance'].transform([input_dict['Product_importance']])[0]
-    input_dict['Gender'] = encoders['Gender'].transform([input_dict['Gender']])[0]
+def predict(data: ShipmentFeatures):
+    # Encode categorical features
+    warehouse_encoded = le_warehouse.transform([data.Warehouse_block])[0]
+    shipment_encoded = le_shipment.transform([data.Mode_of_Shipment])[0]
+    importance_encoded = le_importance.transform([data.Product_importance])[0]
+    gender_encoded = le_gender.transform([data.Gender])[0]
 
-    features = list(input_dict.values())
-    prediction = model.predict([features])[0]
+    # Prepare input data for model
+    input_data = np.array([[
+        warehouse_encoded,
+        shipment_encoded,
+        data.Customer_care_calls,
+        data.Customer_rating,
+        data.Cost_of_the_Product,
+        data.Prior_purchases,
+        importance_encoded,
+        gender_encoded,
+        data.Discount_offered,
+        data.Weight_in_gms
+    ]])
 
-    return {"prediction": int(prediction)}
+    prediction = model.predict(input_data)
+    result = "On Time" if prediction[0] == 1 else "Delayed"
+    return {"prediction": result}
